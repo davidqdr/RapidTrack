@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Mi Posición</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script type="text/javascript" src="cordova.js"></script>
+
+<link href='http://fonts.googleapis.com/css?family=Raleway' rel='stylesheet' type='text/css'>
+<link rel="stylesheet" href="css/jquery.mobile-1.4.5.min.css" />
+
+<script type="text/javascript" src="js/jquery-2.1.4.min.js"/></script>
+<script type="text/javascript" src="js/jquery.mobile-1.4.5.min.js"></script>
+<script type="text/javascript" charset="utf-8">
+
+// Call onDeviceReady when PhoneGap is loaded.
+//
+// At this point, the document has loaded but phonegap-1.0.0.js has not.
+// When PhoneGap is loaded and talking with the native device,
+// it will call the event `deviceready`.
+
+var cadenaPosicion = null; // Guarda el valor del insert de la posición en la base de datos
+var id = null;
+
+var watchID = null;
+//var db = window.openDatabase("posDB", "1.0", "posDB", 2000000);
+// 
+
+document.addEventListener("deviceready", onDeviceReady, false);
+
+// Base de datos
+
+function populateDB(tx) {
+    tx.executeSql('CREATE TABLE IF NOT EXISTS posiciones(x INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT ,fecha NUMERIC DEFAULT CURRENT_TIMESTAMP, precision INTEGER, lati REAL, long REAL )');
+}
+ 
+function insertDB(tx) {
+
+	tx.executeSql('INSERT INTO posiciones(id, precision, lati, long) VALUES (' + cadenaPosicion + ')');
+}
+
+function insertSuccess(tx) {
+	$('#posicion').text ("GUARDANDO POSICIÓN ... " + id);
+}
+
+function successDB(tx) {
+	$('#posicion').text ("GUARDANDO POSICIÓN ... " + id);
+}
+
+function errorDB(err) {
+	$('#posicion').text ("Error DB: " + err.code + " - " + err.message);
+}
+
+// PhoneGap is loaded and it is now safe to make calls PhoneGap methods
+//
+function onDeviceReady() {
+	// Now safe to use the PhoneGap API
+	
+	$('#btnPosicion').click(function (){ obtenerPosicion();	});
+	$('#btnPararPosicion').click(function (){ clearWatch(); });
+	//$('#').click(function () { window.location = "query.html"; });
+	
+	// Base de datos
+	
+	db.transaction(populateDB, errorDB, false);
+	
+}
+
+function getFechaId (d) {
+    // padding function
+    var s = function(a,b){return(1e15+a+"").slice(-b)};
+
+    // default date parameter
+    if (typeof d === 'undefined'){
+        d = new Date();
+    };
+
+    // return ID datetime
+    return s(d.getFullYear(),2) + 
+    	s(d.getMonth()+1,2) + 
+    	s(d.getDate(),2) +
+        s(d.getHours(),2) + 
+        s(d.getMinutes(),2) + 
+        s(d.getSeconds(),2)	
+}
+
+function obtenerPosicion() {
+
+	var onSuccess = function(position) {
+
+		if (! id) {
+			var fecha = new Date(position.timestamp);
+			id = getFechaId(fecha);
+		}
+
+		cadenaPosicion = '"' + id + '", ' + position.coords.accuracy.toFixed(2) + ', ' + position.coords.latitude + ', ' + position.coords.longitude; 
+
+		// Base de datos
+		var db = window.openDatabase("posDB","1.0", "posDB", 2000000);
+		//db.transaction(populateDB, errorDB, successDB); 
+				
+		db.transaction(insertDB, errorDB, insertSuccess);
+		//db.transaction(query, error);
+	}
+	
+	function onError(error) {
+		$('#posicion').text ("Error code: " + error.code + "\n" + "Mensaje: " + error.message );
+	}
+	
+	var options = { maximumAge: 3000, timeout: 5000, enableHighAccuracy: true };
+	watchID = navigator.geolocation.watchPosition(onSuccess, onError, options);
+}
+
+    // clear the watch that was started earlier
+    //
+    function clearWatch() {
+        if (watchID != null) {
+            navigator.geolocation.clearWatch(watchID);
+            watchID = null;
+			$('#posicion').text ("");
+        }
+    }
+	
+function query(tx) {
+	tx.executeSql('SELECT lati FROM posiciones', [], querySuc, errorDB);
+}
+function querySuc(tx, results) {
+	var len = results.rows.length;
+	var string = "Rows: " + len + " ";
+	for (var i=0; i<len; i++) {
+		string += results.rows.item(i).lati + " ";
+	}
+	$('#posicion').text(string);
+}
+
+</script>
+<style>
+#posicion { font-family: 'Raleway', sans-serif; }
+</style>
+</head>
+<body>
+
+<div data-role="page">
+  <div data-role="header" data-position="fixed" data-theme="b">
+		<a href="#" class="ui-btn ui-btn-b ui-corner-all ui-shadow ui-icon-home ui-btn-icon-left">Inicio</a>
+    <h1>RapidTrack</h1>
+	    <a href="query.html" class="ui-btn ui-corner-all ui-shadow ui-icon-navigation ui-btn-icon-left">Mapa</a>
+  </div>
+  <div data-role="main" class="ui-content">
+     <div id="posicion"></div>
+	 <button id="btnPosicion" class="ui-btn ui-btn-b ui-btn-inline ui-corner-all">COMENZAR</button>
+	 <button id="btnPararPosicion" class="ui-btn ui-btn-b ui-btn-inline ui-corner-all">&nbsp;&nbsp;PARAR&nbsp;&nbsp;</button>
+
+  </div>
+  <div data-role="footer">
+    <h1>Footer Text</h1>
+  </div>
+</div>
+<!--end of Page -->
+
+</body>
+</html>
